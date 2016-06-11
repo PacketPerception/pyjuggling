@@ -1,7 +1,7 @@
 Pyjuggling: The Python Juggling Library!
 ================================================
 
-|build| |docs| |coverage| |downloads| |license|
+|build| |docs| |coverage| |downloads| |license| |gitter|
 
 .. |coverage| image:: https://img.shields.io/coveralls/PacketPerception/pyjuggling/master.svg
     :target: https://coveralls.io/r/PacketPerception/pyjuggling?branch=master
@@ -17,6 +17,10 @@ Pyjuggling: The Python Juggling Library!
 
 .. |license| image:: https://img.shields.io/pypi/l/pyjuggling.svg
     :target: https://pypi.python.org/pypi/pyjuggling/
+
+.. |gitter| image:: https://badges.gitter.im/PacketPerception/pyjuggling.svg
+    :alt: Join the chat at https://gitter.im/PacketPerception/pyjuggling
+    :target: https://gitter.im/PacketPerception/pyjuggling?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
 
 **Pyjuggling** 
 
