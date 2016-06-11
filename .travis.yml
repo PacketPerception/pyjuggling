@@ -7,6 +7,6 @@ python:
 install:
     - "pip install -r tests/test_requirements.txt"
 script:
-    - nosetests --with-coverage --cover-package=pyjuggling
+    - nosetests --with-coverage --cover-package=juggling
 after_success:
     - coveralls
