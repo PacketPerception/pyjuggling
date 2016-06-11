@@ -5,7 +5,7 @@ from ..pattern import Pattern
 
 
 __all__ = ['Siteswap', 'siteswap_char_to_int', 'siteswap_int_to_char', 'is_valid_siteswap_syntax',
-           'convert_str_to_beat']
+           'convert_str_to_beat_list', 'convert_char_to_beat']
 
 
 def siteswap_char_to_int(char):
