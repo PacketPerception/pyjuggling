@@ -88,16 +88,30 @@ def convert_char_to_beat(beat_str):
     if beat_str.startswith('['):
         return [siteswap_char_to_int(_) for _ in beat_str[1:-1]]
     elif beat_str.startswith('('):
-        # TODO: This is wrong, just put it in here for the time being because its almost right
-        return [_ for _ in convert_str_to_beat_list(beat_str[1:-1].split(','))]
+        s = beat_str[1:-1].split(',')
+        return (convert_str_to_beat_list(s[0], 1)[0],
+                convert_str_to_beat_list(s[1], -1)[0])
     else:
         return siteswap_char_to_int(beat_str)
 
 
-def convert_str_to_beat_list(siteswap):
+def convert_str_to_beat_list(siteswap, hand_modifier=0):
     # type: (str) -> list
-    """ Converts a siteswap string to a :class:`Pattern` beat list """
-    return [convert_char_to_beat(_.group()) for _ in re.finditer(BEAT_RE, siteswap, re.IGNORECASE)]
+    """ Converts a siteswap string to a :class:`Pattern` beat list
+    :param hand_modifier: Used internally for recusively parsing left/right hand sides of SSS
+    """
+    raw_beats = list(_.group() for _ in re.finditer(BEAT_RE, siteswap, re.IGNORECASE))
+    beats = []
+    for beat in raw_beats:
+        if beat.lower().endswith(')*'):
+            s = beat[1:-2].split(',')
+            beats.append(convert_char_to_beat(beat[:-1]))
+            beats.append(convert_char_to_beat('({},{})'.format(s[1], s[0])))
+        elif len(beat) == 2 and beat[1].lower() == 'x':
+            beats.append(convert_char_to_beat(beat[0]) + hand_modifier)
+        else:
+            beats.append(convert_char_to_beat(beat))
+    return beats
 
 
 class Siteswap(JugglingNotation):
