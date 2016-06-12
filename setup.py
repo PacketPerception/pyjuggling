@@ -5,9 +5,9 @@ import os
 import sys
 
 try:
-    from setuptools import setup
+    from setuptools import setup, find_packages
 except ImportError:
-    from distutils.core import setup
+    from distutils.core import setup, find_packages
 
 import juggling
 
@@ -28,9 +28,7 @@ setup(
     author='Brian Knobbs',
     author_email='brian@packetperception.org',
     url='https://github.com/PacketPerception/pyjuggling',
-    packages=[
-        'juggling',
-    ],
+    packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
     extras_require={
     },
     license='MIT',

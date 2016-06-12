@@ -85,7 +85,6 @@ def is_valid_siteswap_syntax(pattern, num_jugglers=1, return_match=False):
 def convert_char_to_beat(beat_str):
     # type: (str) -> (int or list)
     """ Converts a single siteswap beat into a :class:`Pattern` beat """
-    print("converting: {}".format(beat_str))
     if beat_str.startswith('['):
         return [siteswap_char_to_int(_) for _ in beat_str[1:-1]]
     elif beat_str.startswith('('):

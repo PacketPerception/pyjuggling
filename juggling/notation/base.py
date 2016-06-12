@@ -1,3 +1,7 @@
+import json
+import types
+
+
 class JugglingNotation(object):
     def __init__(self, notation_pattern, raise_invalid=False):
         # type: (Any, int, bool)
@@ -33,3 +37,18 @@ class JugglingNotation(object):
 
     def pretty_print(self):
         print(str(self.notation_pattern))
+
+    def to_JSON(self):
+        """ Return a JSON serialized version of the :class:`Notation` """
+        # We build up this data dict so that we capture the @properties as well as the attributes as well as get all
+        # inherited properties and values
+        data = {}
+        for attr in dir(self):
+            if attr.startswith('__'):
+                continue
+            value = getattr(self, attr)
+            if not (isinstance(value, types.MethodType) or
+                    isinstance(value, types.FunctionType)):
+                data[attr] = value
+
+        return json.dumps(data, default=lambda o: o.__dict__, sort_keys=True, indent=4)
