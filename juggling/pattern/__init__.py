@@ -14,6 +14,11 @@ from juggling.utils import CacheProperties
 __all__ = ['Pattern']
 
 
+VANILLA_PATTERN = 'VSS'
+MULTIPLEX_PATTERN = 'MSS'
+SYNCHRONOUS_PATTERN = 'SSS'
+
+
 def flatten_pattern_list(l):
     """ Flattens a pattern list into a list of tuples where each tuple is (beat, throw).
 
@@ -67,11 +72,9 @@ def generate_state(pattern, starting_throw=0):
     offset into the :class:`Pattern` """
 
     state = [None] * (pattern.max_throw * 2)  # principal that the highest throw can go through the pattern twice
-    converted_pattern = convert_sss_to_mss(pattern.data)
-
     # offset the pattern to the `starting_throw`
-    starting_throw %= len(converted_pattern)
-    converted_pattern = converted_pattern[starting_throw:] + converted_pattern[:starting_throw]
+    starting_throw %= len(pattern.converted_to_mss)
+    converted_pattern = pattern.converted_to_mss[starting_throw:] + pattern.converted_to_mss[:starting_throw]
 
     i = current_beat = current_prop = 0
     flattened = flatten_pattern_list(converted_pattern)
@@ -135,22 +138,67 @@ class Pattern(CacheProperties, UserList):
         super(Pattern, self).__setitem__(key, value)
 
     @property
+    def type(self):
+        if isinstance(self[0], tuple):
+            return SYNCHRONOUS_PATTERN
+
+        for throw in self:
+            if isinstance(throw, list):
+                return MULTIPLEX_PATTERN
+
+        return VANILLA_PATTERN
+
+    @property
+    def converted_to_mss(self):
+        return convert_sss_to_mss(self.data)
+
+    @property
+    def throws_with_beats(self):
+        return flatten_pattern_list(self.converted_to_mss)
+
+    @property
+    def throw_destinations(self):
+        total = 0
+        destination = []
+        for throw in self.throws_with_beats:
+            if throw[1] == 0:
+                destination.append(throw[0])
+            else:
+                destination.append((throw[0] + throw[1]) % self.period)
+                total += throw[1]
+        return destination
+
+    @property
+    def incoming(self):
+        incoming = [0] * self.period
+        for beat, dest in enumerate(self.throw_destinations):
+            if self.throws_with_beats[beat][1] != 0:
+                incoming[dest] += 1
+        return incoming
+
+    @property
+    def outgoing(self):
+        outgoing = [0] * self.period
+        for beat in range(len(self.throw_destinations)):
+            if self.throws_with_beats[beat][1] != 0:
+                outgoing[self.throws_with_beats[beat][0]] += 1
+        return outgoing
+
+    @property
     def is_valid(self):
-        if self.states:
-            return True
-        return False
+        return self.incoming == self.outgoing
+
+    def starting_with(self, throw):
+        """ return the pattern if started with throw at index `throw` """
+        throw %= (self.period//2) if self.type == SYNCHRONOUS_PATTERN else self.period
+        return self.data[throw:] + self.data[:throw]
 
     @property
     def states(self):
-        s = []
-        for i in range(0, self.period):
-            _ = tuple(generate_state(self, i))
-            if not _:
-                return []
-
-            if _ not in s:
-                s.append(_)
-        return tuple(s)
+        if self.is_valid:
+            period = (self.period//2) if self.type == SYNCHRONOUS_PATTERN else self.period
+            return tuple(generate_state(self, i) for i in range(0, period))
+        return []
 
     @property
     def num_objects(self):
@@ -165,7 +213,7 @@ class Pattern(CacheProperties, UserList):
 
     @property
     def period(self):
-        return len(convert_sss_to_mss(self))
+        return len(self.converted_to_mss)
 
     @property
     def max_throw(self):
@@ -178,11 +226,14 @@ class Pattern(CacheProperties, UserList):
         return floor(get_max(self.data))  # floor in case of sync crossing throws with .5
 
     @property
-    def ground_state(self):
-        for state in self.states:
-            if len(set(state)) == 1:
-                return state
-        return []
+    def ground_states(self):
+        return [self.starting_with(i) for i, state in enumerate(self.states) if len(set(state)) == 1]
+
+    @property
+    def is_ground_state(self):
+        if self.states:
+            return len(set(self.states[0])) == 1
+        return False
 
     @property
     def current_state(self):
@@ -191,9 +242,42 @@ class Pattern(CacheProperties, UserList):
         return []
 
     @property
-    def transistions(self):
-        # TODO: implement
-        return None
+    def entry_transitions(self):
+        if not self.is_excited:
+            return []
+
+        transition = []
+        current_throw = self.num_objects
+        for beat in self.current_state:
+            if beat > 0:
+                transition.append(current_throw)
+            else:
+                current_throw += 1
+
+        # remove any base pattern throws from the beginning
+        while transition and transition[0] == self.num_objects:
+            del transition[0]
+        return transition
+
+    @property
+    def exit_transitions(self):
+        if not self.is_excited:
+            return []
+
+        transition = []
+        current_zero_loc = 0
+        for i in range(0, self.num_objects):
+            try:
+                next_zero = self.current_state[current_zero_loc:].index(0)
+                current_zero_loc = next_zero + 1
+                transition.append(next_zero - i)
+            except ValueError:
+                transition.append(self.num_objects)
+
+        # remove any base pattern throws from the beginning
+        while transition and transition[-1] == self.num_objects:
+            del transition[-1]
+        return transition
 
     @property
     def is_symmetric(self):
@@ -207,4 +291,4 @@ class Pattern(CacheProperties, UserList):
 
     @property
     def is_excited(self):
-        return 0 in self.current_state
+        return len(set(self.current_state)) != 1
