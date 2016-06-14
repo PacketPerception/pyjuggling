@@ -1,5 +1,5 @@
-from math import floor
 from collections import Iterable
+from math import floor
 
 try:
     # Python3
@@ -8,7 +8,7 @@ except ImportError:
     # Python2
     from UserList import UserList  # noqa
 
-from .utils import CacheProperties
+from juggling.utils import CacheProperties
 
 
 __all__ = ['Pattern']
@@ -135,10 +135,19 @@ class Pattern(CacheProperties, UserList):
         super(Pattern, self).__setitem__(key, value)
 
     @property
+    def is_valid(self):
+        if self.states:
+            return True
+        return False
+
+    @property
     def states(self):
         s = []
         for i in range(0, self.period):
             _ = tuple(generate_state(self, i))
+            if not _:
+                return []
+
             if _ not in s:
                 s.append(_)
         return tuple(s)
@@ -177,7 +186,9 @@ class Pattern(CacheProperties, UserList):
 
     @property
     def current_state(self):
-        return self.states[0]
+        if self.states:
+            return self.states[0]
+        return []
 
     @property
     def transistions(self):

@@ -131,11 +131,6 @@ class Siteswap(JugglingNotation):
             self.pattern = Pattern(convert_str_to_beat_list(self.notation_pattern))
 
     @property
-    def is_valid(self):
-        # TODO: implement site swap validation
-        return True
-
-    @property
     def is_valid_syntax(self):
         # return cached value if we have it
         return is_valid_siteswap_syntax(self.notation_pattern)

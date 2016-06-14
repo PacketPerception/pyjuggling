@@ -1,5 +1,6 @@
 import json
-import types
+
+from juggling.utils import JugglingJSONEncoder
 
 
 class JugglingNotation(object):
@@ -33,7 +34,9 @@ class JugglingNotation(object):
 
     @property
     def is_valid(self):
-        raise ValueError("Notation has not implemented pattern validation")
+        if self.pattern is not None:
+            return self.pattern.is_valid
+        return False
 
     def pretty_print(self):
         print(str(self.notation_pattern))
@@ -42,13 +45,4 @@ class JugglingNotation(object):
         """ Return a JSON serialized version of the :class:`Notation` """
         # We build up this data dict so that we capture the @properties as well as the attributes as well as get all
         # inherited properties and values
-        data = {}
-        for attr in dir(self):
-            if attr.startswith('__'):
-                continue
-            value = getattr(self, attr)
-            if not (isinstance(value, types.MethodType) or
-                    isinstance(value, types.FunctionType)):
-                data[attr] = value
-
-        return json.dumps(data, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+        return json.dumps(self, sort_keys=True, indent=4, cls=JugglingJSONEncoder)

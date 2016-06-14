@@ -1,3 +1,7 @@
+import types
+from json import JSONEncoder
+
+
 class CacheProperties(object):
     """ Will automatically cache property attributes of itself. Can clear with self._clear_cache() """
     _cache_exclude = []
@@ -26,4 +30,18 @@ class CacheProperties(object):
             if name not in cache:
                 cache[name] = super(CacheProperties, self).__getattribute__(name)
             return cache[name]
+
         return super(CacheProperties, self).__getattribute__(name, *args, **kwargs)
+
+
+class JugglingJSONEncoder(JSONEncoder):
+    def default(self, o):
+        data = {}
+        for attr in dir(o):
+            if attr.startswith('_'):
+                continue
+            value = getattr(o, attr)
+            if not (isinstance(value, types.MethodType) or
+                    isinstance(value, types.FunctionType)):
+                data[attr] = value
+        return data
