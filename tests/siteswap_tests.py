@@ -39,6 +39,7 @@ class SiteSwapSyntaxValidationTests(unittest.TestCase):
             '(6x,4)*',
             '[64]020',
             '[33](3,3)123',
+            '(4,2)(2x,[44x])',
         ]
         for pattern in solo_patterns:
             self.assertTrue(siteswap.is_valid_siteswap_syntax(pattern))

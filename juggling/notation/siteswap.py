@@ -53,6 +53,8 @@ def is_valid_siteswap_syntax(pattern, num_jugglers=1, return_match=False):
     >>> is_valid_siteswap_syntax('$$92') == False
     >>> matched, match_object = is_valid_siteswap_syntax('(6x,4)*', return_match=True)
 
+    Note: This ignores ALL whitespace in the given `pattern`
+
     :param pattern: A string of the siteswap to check
     :param num_jugglers:  Number of jugglers involved in the siteswap. This determines whether
         to allow passing notation and also whether the passing notation needs to include the
@@ -63,6 +65,7 @@ def is_valid_siteswap_syntax(pattern, num_jugglers=1, return_match=False):
     :return: A bool whether or not the syntax is valid.
     """
     pattern = str(pattern)
+    pattern = re.sub('\s', '', pattern)  # ignore all whitespace by stripping it out
 
     if num_jugglers < 1:
         raise ValueError("Invalid number of jugglers: {}".format(num_jugglers))
@@ -82,42 +85,46 @@ def is_valid_siteswap_syntax(pattern, num_jugglers=1, return_match=False):
         return m is not None
 
 
-def convert_char_to_beat(beat_str):
+def convert_char_to_beat(beat_str, is_sync=False):
     # type: (str) -> (int or list)
     """ Converts a single siteswap beat into a :class:`Pattern` beat """
+    # print('beat', beat_str)
     if beat_str.startswith('['):
+        if is_sync:
+            return convert_str_to_beat_list(beat_str[1:-1])
         return [siteswap_char_to_int(_) for _ in beat_str[1:-1]]
     elif beat_str.startswith('('):
-        s = beat_str[1:-1].split(',')
-        return (convert_str_to_beat_list(s[0], 1)[0],
-                convert_str_to_beat_list(s[1], -1)[0])
+        return tuple(convert_str_to_beat_list(_, True)[0] for _ in beat_str[1:-1].split(','))
     else:
         return siteswap_char_to_int(beat_str)
 
 
-def convert_str_to_beat_list(siteswap, hand_modifier=0):
+def convert_str_to_beat_list(siteswap, is_sync=False):
     # type: (str) -> list
     """ Converts a siteswap string to a :class:`Pattern` beat list
-    :param hand_modifier: Used internally for recusively parsing left/right hand sides of SSS
+    :param is_sync: Used internally for recusively parsing SSS
     """
+    # print('convert', siteswap, is_sync)
+    siteswap = str(siteswap)
+    siteswap = re.sub('\s', '', siteswap)  # ignore all whitespace by stripping it out
     raw_beats = list(_.group() for _ in re.finditer(BEAT_RE, siteswap, re.IGNORECASE))
     beats = []
     for beat in raw_beats:
         if beat.lower().endswith(')*'):
             s = beat[1:-2].split(',')
-            beats.append(convert_char_to_beat(beat[:-1]))
-            beats.append(convert_char_to_beat('({},{})'.format(s[1], s[0])))
+            beats.append(convert_char_to_beat(beat[:-1], is_sync))
+            beats.append(convert_char_to_beat('({},{})'.format(s[1], s[0]), is_sync))
         elif len(beat) == 2 and beat[1].lower() == 'x':
-            beats.append(convert_char_to_beat(beat[0]) + hand_modifier)
+            beats.append(convert_char_to_beat(beat[0], is_sync) + 0.5)
         else:
-            beats.append(convert_char_to_beat(beat))
+            beats.append(convert_char_to_beat(beat, is_sync))
     return beats
 
 
 class Siteswap(JugglingNotation):
     """ Siteswap notation """
     def __init__(self, notation_pattern, raise_invalid=False):
-        notation_pattern = ''.join(str(notation_pattern))  # removes all whitespace characters
+        notation_pattern = re.sub('\s', '', notation_pattern)  # removes all whitespace characters
         super(Siteswap, self).__init__(notation_pattern=notation_pattern, raise_invalid=raise_invalid)
 
         if self.is_valid_syntax:

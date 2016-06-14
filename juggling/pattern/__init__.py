@@ -1,4 +1,5 @@
 from math import floor
+from collections import Iterable
 
 try:
     # Python3
@@ -11,7 +12,134 @@ except ImportError:
 __all__ = ['Pattern']
 
 
-class Pattern(UserList):
+def flatten_pattern_list(l):
+    """ Flattens a pattern list into a list of tuples where each tuple is (beat, throw).
+
+    >>> flatten_pattern_list([4,4,1])
+        [(0,4),(1,4),(2,1)]
+    >>> flatten_pattern_list([[53],3,1])
+        [(0,5),(0,3),(1,3),(1,1)]
+    >>>
+    """
+    # type: list -> list
+    flattened = []
+    for beat, el in enumerate(l):
+        if isinstance(el, Iterable):
+            for sub in flatten_pattern_list(el):
+                flattened.append((beat, sub[1]))
+        else:
+            flattened.append((beat, el))
+    return flattened
+
+
+def convert_sss_to_mss(pattern_list):
+    """ Flattens a SSS to a MSS, returns a Pattern list """
+    data = []
+
+    def mod_sync(t, mod=0):
+        if isinstance(t, float):
+            return floor(t) + mod
+        return t
+
+    for _ in pattern_list:
+        if isinstance(_, tuple):
+            d = []
+            if isinstance(_[0], list):
+                d.append([mod_sync(n, 1) for n in _[0]])
+            else:
+                d.append(mod_sync(_[0], 1))
+
+            if isinstance(_[1], Iterable):
+                d.append([mod_sync(n, -1) for n in _[1]])
+            else:
+                d.append(mod_sync(_[1], -1))
+            data += d
+        else:
+            data.append(_)
+    return data
+
+
+def generate_state(pattern, starting_throw=0):
+    # type: (Pattern, int) -> list
+    """ Generates a state for a given :class:`Pattern` starting at `starting_throw` which is an
+    offset into the :class:`Pattern` """
+
+    state = [None] * (pattern.max_throw * 2)  # principal that the highest throw can go through the pattern twice
+    converted_pattern = convert_sss_to_mss(pattern.data)
+
+    # offset the pattern to the `starting_throw`
+    starting_throw %= len(converted_pattern)
+    converted_pattern = converted_pattern[starting_throw:] + converted_pattern[:starting_throw]
+
+    i = current_beat = current_prop = 0
+    flattened = flatten_pattern_list(converted_pattern)
+    while current_prop < pattern.num_objects:
+        if flattened[i][1] == 0:
+            state[current_beat] = 1
+        else:
+            if state[current_beat] is None:
+                state[current_beat] = 1
+            else:
+                state[current_beat] += 1
+
+            if state[current_beat] > 0:
+                current_prop += 1
+
+            d = current_beat + flattened[i][1]
+            if state[d] is None:
+                state[d] = -1
+            else:
+                state[d] -= 1
+
+            i += 1
+            if i == len(flattened):
+                i = 0
+                current_beat += 1
+            elif flattened[i][0] != flattened[i-1][0]:
+                current_beat += 1
+
+    # remove trailing info
+    while state and state[-1] is None or state[-1] < 0:
+        del state[-1]
+
+    if -1 in state or None in state:
+        return []
+
+    return state
+
+
+class CacheProperties(object):
+    """ Will automatically cache property attributes of itself. Can clear with self._clear_cache() """
+    _cache_exclude = []
+
+    def __init__(self, *args, **kwargs):  # noqa
+        self._cache = {}
+        super(CacheProperties, self).__init__()
+
+    def _clear_cache(self):
+        try:
+            self._cache.clear()
+        except AttributeError:
+            pass  # means _cache hasn't been set yet
+
+    def __setattr__(self, key, value):
+        if key != '_cache' and key in self._cache:
+            del self._cache[key]
+        super(CacheProperties, self).__setattr__(key, value)
+
+    def __getattribute__(self, name, *args, **kwargs):
+        exclude_attrs = super(CacheProperties, self).__getattribute__('_cache_exclude')
+        if (not name.startswith('__') and
+                name not in ['_cache', '_cached_attrs', '_clear_cache'] + exclude_attrs and
+                isinstance(getattr(self.__class__, name, None), property)):
+            cache = super(CacheProperties, self).__getattribute__('_cache')
+            if name not in cache:
+                cache[name] = super(CacheProperties, self).__getattribute__(name)
+            return cache[name]
+        return super(CacheProperties, self).__getattribute__(name, *args, **kwargs)
+
+
+class Pattern(CacheProperties, UserList):
     """
     The base representation of any juggling pattern, regardless of notation. A :class:`Pattern` looks
     and acts like a list, but has some specific constraints about how data can be stored in it.
@@ -24,30 +152,61 @@ class Pattern(UserList):
     """
     def __init__(self, pattern):
         # TODO: this is a stop-gap, follow the discussion on the group to figure out how we're actually
-        super(Pattern, self).__init__(initlist=pattern)
+        super(Pattern, self).__init__()
+        UserList.__init__(self, initlist=pattern)
 
-        # TODO: implement state generation
-        self.states = []
+    def __setattr__(self, key, value):
+        self._clear_cache()
+        super(Pattern, self).__setattr__(key, value)
+
+    def __setitem__(self, key, value):
+        self._clear_cache()
+        super(Pattern, self).__setitem__(key, value)
+
+    @property
+    def states(self):
+        s = []
+        for i in range(0, self.period):
+            _ = tuple(generate_state(self, i))
+            if _ not in s:
+                s.append(_)
+        return tuple(s)
 
     @property
     def num_objects(self):
-        # TODO: make this handle everything
-        return floor(sum(self.data) / self.period)
+        def get_sum(_):
+            s = 0
+            for i in _:
+                if isinstance(i, (tuple, list)):
+                    i = get_sum(i)
+                s += i
+            return s
+        return floor(get_sum(self.data) / self.period)
 
     @property
     def period(self):
-        # TODO: implement
-        return len(self.data)
+        return len(convert_sss_to_mss(self))
+
+    @property
+    def max_throw(self):
+        def get_max(_, highest=0):
+            for i in _:
+                if isinstance(i, (tuple, list)):
+                    i = get_max(i, highest)
+                highest = max(i, highest)
+            return highest
+        return floor(get_max(self.data))  # floor in case of sync crossing throws with .5
 
     @property
     def ground_state(self):
-        # TODO: implement
-        return None
+        for state in self.states:
+            if len(set(state)) == 1:
+                return state
+        return []
 
     @property
     def current_state(self):
-        # TODO: implement
-        return None
+        return self.states[0]
 
     @property
     def transistions(self):
@@ -66,5 +225,4 @@ class Pattern(UserList):
 
     @property
     def is_excited(self):
-        # TODO: implement
-        return False
+        return 0 in self.current_state
